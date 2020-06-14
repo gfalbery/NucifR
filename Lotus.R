@@ -101,7 +101,43 @@ Buffered$geometry %>% unlist %>%
 LineColour <- "dark grey"
 
 PodLocations %>% ggplot(aes(X, Y)) + 
-  geom_polygon(data = Outline, fill = "white", colour = LineColour) + coord_fixed() + theme_void() +
+  geom_polygon(data = Outline, fill = "white", colour = LineColour) + 
+  coord_fixed() + theme_void() +
   geom_point() + 
   geom_voronoi_segment()
-  
+
+# The pod locations work; on with the aesthetics ####
+
+OuterLimits <- Outline %>% ExtentGet()
+
+OuterLimits[1:2] %>% unlist %>% 
+  expand.grid(X = ., Y = OuterLimits[1:2+2] %>% unlist) %>% 
+  as.matrix -> FlowerExtent
+
+PodLocations %>% 
+  dismo::voronoi(ext = FlowerExtent) -> 
+  Voronoi
+
+1:length(Voronoi@polygons) %>% 
+  map(~Voronoi@polygons[[.x]]@Polygons[[1]]@coords %>% data.frame) %>% 
+  bind_rows(.id = "Polygon") %>% 
+  #mutate_at("Polygon", ~factor(.x, levels = 1:length(Voronoi@polygons))) %>% 
+  rename(X = X1, Y = X2) -> VoronoiDF
+
+VoronoiDF
+
+VoronoiDF %>% 
+  ggplot(aes(X, Y, fill = Polygon)) + 
+  geom_polygon() +
+  geom_polygon(data = Outline, fill = NA, colour = LineColour) + 
+  scale_fill_discrete_sequential(palette = AlberPalettes[[1]])
+
+Voronoi %>% plot
+
+Buffered %>% plot
+
+Voronoi %>% lines
+
+# Making shrunken pod shapes ####
+
+
