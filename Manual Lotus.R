@@ -37,9 +37,9 @@ ManualLocations %>% ggplot(aes(X, Y, label = ID)) +
 
 # Sexual Network ####
 
-2:4 %>% 
+2:3 %>% 
   #sample(40, replace = T) %>% 
-  rep(10) %>% 
+  rep(20) %>% 
   map(function(a){
     
     Begin <- sample(1:20, 1)
@@ -58,7 +58,7 @@ ManualLocations %>% ggplot(aes(X, Y, label = ID)) +
 
 Chains %>% bind_rows -> LinkDF
 
-LinkDF %>% unique %>% RandomSlice(20) %>% as.matrix %>% 
+LinkDF %>% unique %>% RandomSlice(10) %>% as.matrix %>% 
   
   graph_from_edgelist(directed = F) -> SexualNetwork
 
@@ -89,7 +89,7 @@ SexualNetwork %>% plot(layout = as.matrix(ManualLocations[,2:3]))
 
 Chains %>% bind_rows -> LinkDF
 
-LinkDF %>% unique %>% as.matrix %>% 
+LinkDF %>% unique %>% RandomSlice(30) %>% as.matrix %>%
   
   graph_from_edgelist(directed = F) -> AerosolNetwork
 
@@ -157,7 +157,7 @@ SexualNetwork %>% plot #(layout = as.matrix(ManualLocations[,2:3]))
 
 Chains %>% bind_rows -> LinkDF
 
-LinkDF %>% unique %>% as.matrix %>% 
+LinkDF %>% unique %>% as.matrix %>% RandomSlice(30) %>% 
   
   graph_from_edgelist(directed = F) -> AerosolNetwork2
 
@@ -166,10 +166,7 @@ AerosolNetwork2 %>% plot #(layout = as.matrix(ManualLocations[,2:3]))
 
 # Plotting ####
 
-Layout <- layout.sphere(AerosolNetwork2)
-
-AerosolNetwork2 %>% plot(layout = Layout)
-SexualNetwork2 %>% plot(layout = Layout)
+# Lower Density ####
 
 SexualNetwork %>% ggraph(mode = "undirected", 
                          layout = ManualLocations[,c("X", "Y")] %>% as.matrix) +
@@ -187,13 +184,17 @@ AerosolNetwork %>% ggraph(mode = "undirected",
   # geom_node_point(size = 8, fill = "white", colour = "white") + 
   coord_fixed() -> Figure2
 
+# Greater Density ####
+
+Layout <- layout.sphere(AerosolNetwork2)
+
 SexualNetwork2 %>% ggraph(mode = "undirected", 
                           layout = Layout) +
   # geom_edge_link(width = 2, alpha = 0.4) +
   geom_edge_diagonal(width = 2, alpha = 0.4, colour = AlberColours[["Blue"]]) + 
   geom_node_point(size = 10, fill = "white", colour = "black") + 
   # geom_node_point(size = 8, fill = "white", colour = "white") + 
-  coord_fixed() -> Figure1Denser
+  coord_fixed()  -> Figure1Denser
 
 AerosolNetwork2 %>% ggraph(mode = "undirected", 
                            layout = Layout) +
@@ -203,17 +204,7 @@ AerosolNetwork2 %>% ggraph(mode = "undirected",
   # geom_node_point(size = 8, fill = "white", colour = "white") + 
   coord_fixed() -> Figure2Denser
 
-(Figure1Denser |
-    Figure2Denser)  +
-  ggsave("Figures/LotusPresentation2.jpeg", 
-         units = "mm", height = 150, width = 250,
-         dpi = 600)
-
-(Figure1|Figure1Denser)/
-  (Figure2|Figure2Denser)  +
-  ggsave("Figures/LotusTetrad.jpeg", 
-         units = "mm", height = 250, width = 250,
-         dpi = 600)
+# Putting them together ####
 
 BlankPlot <- Figure1 + 
   geom_rect(xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = Inf, fill = "white", colour ="white")
