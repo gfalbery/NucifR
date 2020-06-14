@@ -1,7 +1,25 @@
 
 # Manual Lotus ####
 
-library(tidyverse); library(magrittr); library(igraph)
+library(tidyverse); library(magrittr); library(igraph); library(ggregplot); library(cowplot)
+
+library(INLA); library(ggregplot); library(tidyverse); library(GGally); library(patchwork)
+library(cowplot); library(gganimate); library(colorspace); library(RColorBrewer); library(MCMCglmm)
+library(ggrepel)
+
+theme_set(theme_cowplot() + 
+            theme(strip.background = element_rect(fill = "white")))
+
+AlberPalettes <- c("YlGnBu","Reds","BuPu", "PiYG")
+AlberColours <- sapply(AlberPalettes, function(a) RColorBrewer::brewer.pal(5, a)[4])
+
+AlberColours[length(AlberColours)+1:2] <- 
+  
+  RColorBrewer::brewer.pal(11, AlberPalettes[[4]])[c(2,10)]
+
+AlberColours <- append(AlberColours, list(Pink = "#FD6396", Blue = "#3C78D8")) %>% unlist
+
+# Importing ####
 
 ManualLocations <- read.delim("LotusLocations.txt", header = F) %>% 
   rename(X = V1, Y = V2) %>% 
@@ -78,5 +96,23 @@ AerosolNetwork %>% plot(layout = as.matrix(ManualLocations[,2:3]))
 
 # Trying a ggraph ####
 
+library(ggraph)
 
+SexualNetwork %>% ggraph(mode = "undirected", 
+                         layout = ManualLocations[,c("X", "Y")] %>% as.matrix) +
+  # geom_edge_link(width = 2, alpha = 0.4) +
+  geom_edge_diagonal(width = 2, alpha = 0.4, colour = AlberColours[["Blue"]]) + 
+  geom_node_point(size = 10, fill = "white", colour = "black") + 
+  geom_node_point(size = 8, fill = "white", colour = "white") + 
+  coord_fixed() -> Figure1
 
+AerosolNetwork %>% ggraph(mode = "undirected", 
+                          layout = ManualLocations[,c("X", "Y")] %>% as.matrix) +
+  # geom_edge_link(width = 2, alpha = 0.4) +
+  geom_edge_diagonal(width = 2, alpha = 0.4, colour = AlberColours[["Pink"]]) + 
+  geom_node_point(size = 10, fill = "white", colour = "black") + 
+  geom_node_point(size = 8, fill = "white", colour = "white") + 
+  coord_fixed() -> Figure2
+
+Figure1 + ggtitle("Sexual") |
+  Figure2 + ggtitle("Aerosol") 
