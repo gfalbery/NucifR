@@ -1,11 +1,12 @@
 
 # Lotus ####
 
-library(tidyverse); library(sf); library(spatial); library(sp); library(adehabitatHR)
+library(tidyverse); library(sf); library(spatial); library(sp); library(adehabitatHR);library(igraph)
+library(ggforce)
 
 N <- 1000
 
-NPods <- 30
+NPods <- 20
 
 Size <- 1
 
@@ -63,13 +64,44 @@ Hull[,c("X", "Y")] %>%
   Polygons(ID = '0') %>%
   list %>% SpatialPolygons %>%
   st_as_sf %>% 
-  st_buffer(Size/2) -> Buffered
+  st_buffer(Size/1.5) -> Buffered
 
 plot(Buffered)
+
+polygon(Hull)
 
 points(Locations)
 
 # Creating subsections of the lotus ####
 
+M1 <- table(data.frame(1:NPods, 1:NPods))
 
+diag(M1) <- 0
 
+M1 %>% graph_from_adjacency_matrix() %>% layout.auto() -> PodLocations
+
+PodLocations[,1] %<>% scales::rescale(c(min(Hull[,1]), max(Hull[,1])))
+
+PodLocations[,2] %<>% scales::rescale(c(min(Hull[,2]), max(Hull[,2])))
+
+PodLocations %<>% data.frame %>% rename(X = X1, Y = X2)
+
+plot(Buffered)
+
+#polygon(Hull)
+#points(Locations)
+
+points(Layout, col = "red")
+
+Buffered$geometry %>% unlist %>% 
+  matrix(ncol = 2) %>% data.frame %>% 
+  rename(X = X1, Y = X2) -> 
+  Outline
+
+LineColour <- "dark grey"
+
+PodLocations %>% ggplot(aes(X, Y)) + 
+  geom_polygon(data = Outline, fill = "white", colour = LineColour) + coord_fixed() + theme_void() +
+  geom_point() + 
+  geom_voronoi_segment()
+  
