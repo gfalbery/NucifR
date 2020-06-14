@@ -129,7 +129,7 @@ VoronoiDF
 VoronoiDF %>% 
   ggplot(aes(X, Y, fill = Polygon)) + 
   geom_polygon() +
-  geom_polygon(data = Outline, fill = NA, colour = LineColour) + 
+  geom_polygon(data = Outline, fill = NA, colour = LineColour, size = 4) + 
   scale_fill_discrete_sequential(palette = AlberPalettes[[1]])
 
 Voronoi %>% plot
@@ -140,4 +140,147 @@ Voronoi %>% lines
 
 # Making shrunken pod shapes ####
 
+.x <- 1
 
+Voronoi@polygons[[.x]]@Polygons[[1]]@coords %>% data.frame
+
+1:length(Voronoi@polygons) %>% 
+  map(~Voronoi@polygons[[.x]]@Polygons[[1]] %>% 
+        list %>%
+        Polygons(ID = '0') %>%
+        list %>% SpatialPolygons %>%
+        st_as_sf %>% st_centroid %>% 
+        unlist %>% as_tibble %>% t %>% as_tibble) %>% 
+  bind_rows(.id = "Polygon") %>% rename(X = V1, Y= V2) ->
+  Centroids
+
+Centroids[,2:3] %>% plot
+points(PodLocations)
+Voronoi %>% lines
+
+# Centroids and pod locations are similar ####
+
+Size <- 10
+
+Voronoi@polygons[[.x]]@Polygons[[1]]@coords %>% 
+  data.frame %>% rename(X = X1, Y = X2) %>% 
+  apply(1, function(a){
+    
+    #print(a)
+    
+    data.frame(1:Size, X = a[["X"]], Y = a[["Y"]]) %>% #bind_rows %>% 
+      bind_rows(PodLocations[.x, ]) %>% 
+      summarise_at(c("X", "Y"), mean)
+    
+  }) %>% bind_rows() %>% points
+
+# Trying a different approach ####
+
+Shrink <- 3
+
+Voronoi@polygons[[.x]]@Polygons[[1]]@coords %>% plot
+
+Voronoi@polygons[[.x]]@Polygons[[1]]@coords %>% 
+  data.frame %>% rename(X = X1, Y = X2) %>% 
+  apply(1, function(a){
+    
+    #print(a)
+    
+    data.frame(1:Shrink, 
+               X = PodLocations[.x, "X"], 
+               Y = PodLocations[.x, "Y"]) %>% #bind_rows %>% 
+      bind_rows(data.frame(X = a[["X"]], Y = a[["Y"]]) ) %>% 
+      summarise_at(c("X", "Y"), mean)
+    
+  }) %>% bind_rows() %>% points
+
+# Adding buffer ####
+
+Shrink <- 3
+
+Grow <- 0.1
+
+Voronoi@polygons[[.x]]@Polygons[[1]]@coords %>% plot
+
+1:length(Voronoi@polygons) %>% 
+  map(~Voronoi@polygons[[.x]]@Polygons[[1]]@coords %>% 
+        data.frame %>% rename(X = X1, Y = X2) %>% 
+        apply(1, function(a){
+          
+          #print(a)
+          
+          data.frame(1:Shrink, 
+                     X = PodLocations[.x, "X"], 
+                     Y = PodLocations[.x, "Y"]) %>% #bind_rows %>% 
+            bind_rows(data.frame(X = a[["X"]], Y = a[["Y"]]) ) %>% 
+            summarise_at(c("X", "Y"), mean)
+          
+        }) %>% bind_rows() %>% 
+        Polygon() %>% list %>%
+        Polygons(ID = '0') %>%
+        list %>% SpatialPolygons %>%
+        st_as_sf %>% 
+        st_buffer(Grow) %>% extract2("geometry") %>% unlist %>% 
+        matrix(ncol = 2) %>% data.frame %>% 
+        rename(X = X1, Y = X2) -> 
+        PodOutline
+  ) %>% bind_rows(.id = "Polygon") -> PodPolygons
+
+PodPolygons[,2:3] %>% lines
+
+VoronoiDF %>% 
+  ggplot(aes(X, Y)) + #, fill = Polygon)) + 
+  geom_polygon(fill = "white", colour = LineColour, aes(group = Polygon)) +
+  geom_polygon(data = Outline, fill = NA, colour = LineColour, size = 4) + 
+  scale_fill_discrete_sequential(palette = AlberPalettes[[1]]) +
+  geom_polygon(data = PodPolygons, aes(group = Polygon))
+
+# This sort-of works but need to mask the voronois slightly ####
+
+Outline %>% Polygon() %>% list %>%
+  Polygons(ID = '0') %>%
+  list %>% SpatialPolygons -> SpatialBuffered
+
+.x <- 10
+
+Voronoi@polygons[[.x]]@Polygons[[1]]@coords %>% plot
+
+1:length(Voronoi@polygons) %>% 
+  map(~Voronoi@polygons[[.x]]@Polygons[[1]]@coords %>% 
+        Polygon() %>% list %>%
+        Polygons(ID = '0') %>%
+        list %>% SpatialPolygons %>% crop(SpatialBuffered, .) %>% 
+        (function(a){a@polygons[[1]]@Polygons[[1]]@coords}) %>% 
+        data.frame %>% rename(X = x, Y = y) %>% 
+        apply(1, function(a){
+          
+          #print(a)
+          
+          data.frame(1:Shrink, 
+                     X = PodLocations[.x, "X"], 
+                     Y = PodLocations[.x, "Y"]) %>% #bind_rows %>% 
+            bind_rows(data.frame(X = a[["X"]], Y = a[["Y"]]) ) %>% 
+            summarise_at(c("X", "Y"), mean)
+          
+        }) %>% bind_rows() %>% 
+        Polygon() %>% list %>%
+        Polygons(ID = '0') %>%
+        list %>% SpatialPolygons %>%
+        st_as_sf %>% 
+        st_buffer(Grow) %>% extract2("geometry") %>% unlist %>% 
+        matrix(ncol = 2) %>% data.frame %>% 
+        rename(X = X1, Y = X2) -> 
+        PodOutline
+      
+       #PodOutline %>% lines
+      
+) %>% bind_rows(.id = "Polygon") -> PodPolygons
+
+PodPolygons[,2:3] %>% lines
+
+VoronoiDF %>% 
+  ggplot(aes(X, Y)) + #, fill = Polygon)) + 
+  geom_polygon(fill = "white", colour = LineColour, aes(group = Polygon)) +
+  geom_polygon(data = Outline, fill = NA, colour = LineColour, size = 4) + 
+  scale_fill_discrete_sequential(palette = AlberPalettes[[1]]) +
+  geom_polygon(data = PodPolygons, aes(group = Polygon))
