@@ -59,12 +59,14 @@ plot(Hull)
 
 # Buffering the bounds of the lotus ####
 
+BufferWidth <- Size/1.2
+
 Hull[,c("X", "Y")] %>%
   Polygon() %>% list %>%
   Polygons(ID = '0') %>%
   list %>% SpatialPolygons %>%
   st_as_sf %>% 
-  st_buffer(Size/1.5) -> Buffered
+  st_buffer(BufferWidth) -> Buffered
 
 plot(Buffered)
 
@@ -272,9 +274,9 @@ Voronoi@polygons[[.x]]@Polygons[[1]]@coords %>% plot
         rename(X = X1, Y = X2) -> 
         PodOutline
       
-       #PodOutline %>% lines
+      #PodOutline %>% lines
       
-) -> PodPolygonList
+  ) -> PodPolygonList
 
 PodPolygonList %>% bind_rows(.id = "Polygon") -> PodPolygons
 
@@ -290,8 +292,8 @@ VoronoiDF %>%
 
 # Adding some shading ####
 
-XOffset <- 0.1
-YOffset <- - 0.05
+XShadowOffset <- 0.1
+YShadowOffset <- - 0.05
 
 ShadingDirection = "CloseUp"
 
@@ -301,47 +303,47 @@ ShadowNoise <- 0.025
 
 if(ShadingDirection == "Uniform"){
   
-  XOffset <- rep(XOffset, NPods)
-  YOffset <- rep(YOffset, NPods)
+  XShadowOffset <- rep(XShadowOffset, NPods)
+  YShadowOffset <- rep(YShadowOffset, NPods)
   
 } else if(ShadingDirection == "CloseUp"){
   
-  XOffset %<>% abs
-  YOffset %<>% abs
+  XShadowOffset %<>% abs
+  YShadowOffset %<>% abs
   
   -Centroids$X %>% 
-    multiply_by(XOffset) %>% 
+    multiply_by(XShadowOffset) %>% 
     multiply_by(CameraDistance) ->
     
-    XOffset
+    XShadowOffset
   
   -Centroids$Y %>% 
-    multiply_by(YOffset) %>% 
+    multiply_by(YShadowOffset) %>% 
     multiply_by(CameraDistance) ->
     
-    YOffset
+    YShadowOffset
   
 }else if(ShadingDirection == "Varied"){
   
-  XOffset %<>% abs
-  YOffset %<>% abs
+  XShadowOffset %<>% abs
+  YShadowOffset %<>% abs
   
-  XOffset <- runif(NPods, -XOffset, XOffset)
-  YOffset <- runif(NPods, -YOffset, YOffset)
+  XShadowOffset <- runif(NPods, -XShadowOffset, XShadowOffset)
+  YShadowOffset <- runif(NPods, -YShadowOffset, YShadowOffset)
   
 }
 
 if(!is.null(ShadowNoise)){
   
-  YOffset <- YOffset + rnorm(NPods, 0, ShadowNoise)
-  XOffset <- XOffset + rnorm(NPods, 0, ShadowNoise)
+  YShadowOffset <- YShadowOffset + rnorm(NPods, 0, ShadowNoise)
+  XShadowOffset <- XShadowOffset + rnorm(NPods, 0, ShadowNoise)
   
 }
 
 1:length(Voronoi@polygons) %>% 
   map(~PodPolygonList[[.x]] %>% 
-        mutate_at("X", function(x) x + XOffset[.x]) %>% 
-        mutate_at("Y", function(y) y + YOffset[.x]) %>% 
+        mutate_at("X", function(x) x + XShadowOffset[.x]) %>% 
+        mutate_at("Y", function(y) y + YShadowOffset[.x]) %>% 
         Polygon() %>% list %>%
         Polygons(ID = '0') %>%
         list %>% SpatialPolygons %>% 
@@ -370,26 +372,54 @@ VoronoiDF %>%
 
 PodJitter <- 0
 
+LineColour <- "black"
+
 VoronoiDF %>% 
   ggplot(aes(X, Y)) + #, fill = Polygon)) + 
   #geom_polygon(fill = "white", colour = LineColour, aes(group = Polygon)) +
   # geom_polygon(data = Outline, fill = NA, colour = LineColour) + 
-  geom_polygon(data = Outline, fill = NA, colour = "black") + 
   scale_fill_discrete_sequential(palette = AlberPalettes[[1]]) +
   geom_polygon(data = PodInteriors, aes(group = Polygon), 
-               fill = "white", colour = "dark grey") +
-  geom_polygon(data = PodPolygons, aes(group = Polygon), 
-               colour = "black", size = 1) +
-  geom_polygon(data = PodInteriors, aes(group = Polygon), 
-               fill = "white", colour = NA)  +
-  coord_fixed() +
-  geom_point(data = PodLocations %>% 
-               mutate_at("X", ~.x + XOffset) %>% 
-               mutate_at("Y", ~.x + YOffset) %>% 
-                RandomSlice(round(NPods)),
-             position = position_jitter(w = PodJitter, h = PodJitter),
-             alpha = 0.6) + 
-  theme_void()
+               fill = "white", colour = LineColour)  +
+  coord_fixed() + 
+  theme_void() ->
+  
+  FlowerPlot
+
+OutlineAdd <- ShadowAdd <- PointAdd <- T
+
+if(ShadowAdd){
+  
+  FlowerPlot <- FlowerPlot +
+    geom_polygon(data = PodPolygons, aes(group = Polygon), 
+                 colour = "black", size = 1) +
+    geom_polygon(data = PodInteriors, aes(group = Polygon), 
+                 fill = "white", colour = NA)
+  
+}
+
+if(PointAdd){
+  
+  FlowerPlot <- FlowerPlot +
+    geom_point(data = PodLocations %>% 
+                 mutate_at("X", ~.x + XShadowOffset) %>% 
+                 mutate_at("Y", ~.x + YShadowOffset) %>% 
+                 RandomSlice(round(NPods)),
+               position = position_jitter(w = PodJitter, h = PodJitter),
+               alpha = 0.6)
+  
+}
+
+if(OutlineAdd){
+  
+  FlowerPlot <- FlowerPlot + 
+    geom_polygon(data = Outline, fill = NA, colour = LineColour)
+  
+}
+
+FlowerPlot
+
+PodLocations %>% rownames_to_column("ID")
 
 
 
