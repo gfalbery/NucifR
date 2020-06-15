@@ -1,31 +1,39 @@
 
 # Lotus ####
 
+library(tidyverse); library(sf); library(spatial); library(sp); library(adehabitatHR);library(igraph)
+library(ggforce); library(magrittr); library(ggregplot); library(raster); library(colorspace)
+
 Lotus <- function(
+  
+  N = 1000,
+  
+  NPods = 20,
+  
+  XNoise = 0,
+  YNoise = 0,
+  
+  # Aesthetics
+  
   OutlineAdd = T,
   ShadowAdd = T,
   PointAdd = T,
   
-  PodJitter = 0,
+  SpotJitter = 0.1,
   
   LineColour = "black",
   
   Shrink = 3,
   
-  Grow = 0.15,
+  Grow = 0.2,
+  
+  # Shadows 
   
   XShadowOffset = - 0.1,
   YShadowOffset = -0.05,
-  
   ShadingDirection = "Uniform",
-  
   CameraDistance = 0.5,
-  
   ShadowNoise = 0.015,
-  
-  N = 1000,
-  
-  NPods = 20,
   
   Size = 1
   
@@ -77,8 +85,10 @@ Lotus <- function(
   
   M1 %>% graph_from_adjacency_matrix() %>% layout.auto() -> PodLocations
   
-  PodLocations[,1] %<>% scales::rescale(c(min(Hull[,1]), max(Hull[,1])))
+  PodLocations[,1] <- PodLocations[,1] + runif(NPods, -XNoise, XNoise)
+  PodLocations[,2] <- PodLocations[,2] + runif(NPods, -XNoise, XNoise)
   
+  PodLocations[,1] %<>% scales::rescale(c(min(Hull[,1]), max(Hull[,1])))
   PodLocations[,2] %<>% scales::rescale(c(min(Hull[,2]), max(Hull[,2])))
   
   PodLocations %<>% data.frame %>% rename(X = X1, Y = X2)
@@ -242,7 +252,7 @@ Lotus <- function(
                    mutate_at("X", ~.x + XShadowOffset) %>% 
                    mutate_at("Y", ~.x + YShadowOffset) %>% 
                    RandomSlice(round(NPods)),
-                 position = position_jitter(w = PodJitter, h = PodJitter),
+                 position = position_jitter(w = SpotJitter, h = SpotJitter),
                  alpha = 0.6)
     
   }
@@ -258,5 +268,23 @@ Lotus <- function(
   
 }
 
-Lotus(#OutlineAdd = F, 
-      Grow = 0.2)
+Lotus(OutlineAdd = F, 
+      NPod = 20, Size = 1,
+      XNoise = 0, YNoise = 0,
+      ShadowNoise = 0.02,
+      SpotJitter = 0.1,
+      Grow = 0.2) + ggsave("Lotus1.jpeg")
+
+Lotus(OutlineAdd = F, 
+      NPod = 20, Size = 1,
+      XNoise = 0, YNoise = 0,
+      Grow = 0.2) + ggsave("Lotus1.jpeg")
+
+Lotus(OutlineAdd = F, 
+      NPod = 50, Size = 2,
+      XNoise = 0, YNoise = 0,
+      SpotJitter = 0.01,
+      XShadowOffset = -0.05,
+      YShadowOffset = -0.05,
+      
+      Grow = 0.1) #+ ggsave("Lotus1.jpeg")
