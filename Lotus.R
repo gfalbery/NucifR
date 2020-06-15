@@ -281,7 +281,7 @@ PodPolygonList %>% bind_rows(.id = "Polygon") -> PodPolygons
 PodPolygons[,2:3] %>% lines
 
 VoronoiDF %>% 
-  ggplot(aes(X, Y)) + #, fill = Polygon)) + 
+  ggplot(aes(X, Y, fill = Polygon)) + 
   #geom_polygon(fill = "white", colour = LineColour, aes(group = Polygon)) +
   geom_polygon(data = Outline, fill = NA, colour = LineColour) + 
   scale_fill_discrete_sequential(palette = AlberPalettes[[1]]) +
@@ -293,9 +293,11 @@ VoronoiDF %>%
 XOffset <- 0.1
 YOffset <- - 0.05
 
-ShadingDirection = "Varied"
+ShadingDirection = "CloseUp"
 
-CameraDistance <- 1
+CameraDistance <- 0.5
+
+ShadowNoise <- 0.025
 
 if(ShadingDirection == "Uniform"){
   
@@ -307,13 +309,13 @@ if(ShadingDirection == "Uniform"){
   XOffset %<>% abs
   YOffset %<>% abs
   
-  PodLocations$X %>% 
+  -Centroids$X %>% 
     multiply_by(XOffset) %>% 
     multiply_by(CameraDistance) ->
     
     XOffset
   
-  PodLocations$Y %>% 
+  -Centroids$Y %>% 
     multiply_by(YOffset) %>% 
     multiply_by(CameraDistance) ->
     
@@ -326,6 +328,13 @@ if(ShadingDirection == "Uniform"){
   
   XOffset <- runif(NPods, -XOffset, XOffset)
   YOffset <- runif(NPods, -YOffset, YOffset)
+  
+}
+
+if(!is.null(ShadowNoise)){
+  
+  YOffset <- YOffset + rnorm(NPods, 0, ShadowNoise)
+  XOffset <- XOffset + rnorm(NPods, 0, ShadowNoise)
   
 }
 
@@ -356,6 +365,34 @@ VoronoiDF %>%
   geom_polygon(data = PodInteriors, aes(group = Polygon), 
                fill = "white", colour = "dark grey") +
   coord_fixed()
+
+# Adding it all together ####
+
+PodJitter <- 0
+
+VoronoiDF %>% 
+  ggplot(aes(X, Y)) + #, fill = Polygon)) + 
+  #geom_polygon(fill = "white", colour = LineColour, aes(group = Polygon)) +
+  # geom_polygon(data = Outline, fill = NA, colour = LineColour) + 
+  geom_polygon(data = Outline, fill = NA, colour = "black") + 
+  scale_fill_discrete_sequential(palette = AlberPalettes[[1]]) +
+  geom_polygon(data = PodInteriors, aes(group = Polygon), 
+               fill = "white", colour = "dark grey") +
+  geom_polygon(data = PodPolygons, aes(group = Polygon), 
+               colour = "black", size = 1) +
+  geom_polygon(data = PodInteriors, aes(group = Polygon), 
+               fill = "white", colour = NA)  +
+  coord_fixed() +
+  geom_point(data = PodLocations %>% 
+               mutate_at("X", ~.x + XOffset) %>% 
+               mutate_at("Y", ~.x + YOffset) %>% 
+                RandomSlice(round(NPods)),
+             position = position_jitter(w = PodJitter, h = PodJitter),
+             alpha = 0.6) + 
+  theme_void()
+
+
+
 
 
 
