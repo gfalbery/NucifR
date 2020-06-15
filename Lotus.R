@@ -198,7 +198,7 @@ Voronoi@polygons[[.x]]@Polygons[[1]]@coords %>%
 
 Shrink <- 3
 
-Grow <- 0.1
+Grow <- 0.15
 
 Voronoi@polygons[[.x]]@Polygons[[1]]@coords %>% plot
 
@@ -274,13 +274,89 @@ Voronoi@polygons[[.x]]@Polygons[[1]]@coords %>% plot
       
        #PodOutline %>% lines
       
-) %>% bind_rows(.id = "Polygon") -> PodPolygons
+) -> PodPolygonList
+
+PodPolygonList %>% bind_rows(.id = "Polygon") -> PodPolygons
 
 PodPolygons[,2:3] %>% lines
 
 VoronoiDF %>% 
   ggplot(aes(X, Y)) + #, fill = Polygon)) + 
-  geom_polygon(fill = "white", colour = LineColour, aes(group = Polygon)) +
-  geom_polygon(data = Outline, fill = NA, colour = LineColour, size = 4) + 
+  #geom_polygon(fill = "white", colour = LineColour, aes(group = Polygon)) +
+  geom_polygon(data = Outline, fill = NA, colour = LineColour) + 
   scale_fill_discrete_sequential(palette = AlberPalettes[[1]]) +
-  geom_polygon(data = PodPolygons, aes(group = Polygon))
+  geom_polygon(data = PodPolygons, aes(group = Polygon), 
+               fill = "white", colour = LineColour)
+
+# Adding some shading ####
+
+XOffset <- 0.1
+YOffset <- - 0.05
+
+ShadingDirection = "Varied"
+
+CameraDistance <- 1
+
+if(ShadingDirection == "Uniform"){
+  
+  XOffset <- rep(XOffset, NPods)
+  YOffset <- rep(YOffset, NPods)
+  
+} else if(ShadingDirection == "CloseUp"){
+  
+  XOffset %<>% abs
+  YOffset %<>% abs
+  
+  PodLocations$X %>% 
+    multiply_by(XOffset) %>% 
+    multiply_by(CameraDistance) ->
+    
+    XOffset
+  
+  PodLocations$Y %>% 
+    multiply_by(YOffset) %>% 
+    multiply_by(CameraDistance) ->
+    
+    YOffset
+  
+}else if(ShadingDirection == "Varied"){
+  
+  XOffset %<>% abs
+  YOffset %<>% abs
+  
+  XOffset <- runif(NPods, -XOffset, XOffset)
+  YOffset <- runif(NPods, -YOffset, YOffset)
+  
+}
+
+1:length(Voronoi@polygons) %>% 
+  map(~PodPolygonList[[.x]] %>% 
+        mutate_at("X", function(x) x + XOffset[.x]) %>% 
+        mutate_at("Y", function(y) y + YOffset[.x]) %>% 
+        Polygon() %>% list %>%
+        Polygons(ID = '0') %>%
+        list %>% SpatialPolygons %>% 
+        crop(., PodPolygonList[[.x]] %>% 
+               Polygon() %>% list %>%
+               Polygons(ID = '0') %>%
+               list %>% SpatialPolygons) %>% 
+        (function(a){a@polygons[[1]]@Polygons[[1]]@coords}) %>% 
+        data.frame %>% rename(X = x, Y = y)
+  ) %>% bind_rows(.id = "Polygon") -> 
+  
+  PodInteriors
+
+VoronoiDF %>% 
+  ggplot(aes(X, Y)) + #, fill = Polygon)) + 
+  #geom_polygon(fill = "white", colour = LineColour, aes(group = Polygon)) +
+  geom_polygon(data = Outline, fill = NA, colour = LineColour) + 
+  scale_fill_discrete_sequential(palette = AlberPalettes[[1]]) +
+  geom_polygon(data = PodPolygons, aes(group = Polygon), 
+               colour = LineColour) +
+  geom_polygon(data = PodInteriors, aes(group = Polygon), 
+               fill = "white", colour = "dark grey") +
+  coord_fixed()
+
+
+
+
