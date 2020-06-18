@@ -8,7 +8,7 @@ Lotus <- function(
   
   N = 1000,
   
-  NPods = 20,
+  NPods = 35,
   
   XNoise = 0,
   YNoise = 0,
@@ -18,6 +18,8 @@ Lotus <- function(
   OutlineAdd = T,
   ShadowAdd = T,
   PointAdd = T,
+  
+  NetworkAdd = F,
   
   SpotJitter = 0.1,
   
@@ -35,7 +37,9 @@ Lotus <- function(
   CameraDistance = 0.5,
   ShadowNoise = 0.015,
   
-  Size = 1
+  Size = 1,
+  
+  RemoveOuter = "Relaxed"
   
 ){
   
@@ -114,7 +118,8 @@ Lotus <- function(
     map(~Voronoi@polygons[[.x]]@Polygons[[1]]@coords %>% data.frame) %>% 
     bind_rows(.id = "Polygon") %>% 
     #mutate_at("Polygon", ~factor(.x, levels = 1:length(Voronoi@polygons))) %>% 
-    rename(X = X1, Y = X2) -> VoronoiDF
+    rename(X = X1, Y = X2) -> 
+    VoronoiDF
   
   # Making shrunken pod shapes ####
   
@@ -163,6 +168,36 @@ Lotus <- function(
   
   PodPolygonList %>% bind_rows(.id = "Polygon") -> PodPolygons
   
+  if(RemoveOuter == "Relaxed"){
+    
+    Centroids %>% 
+      dplyr::select(X,Y) %>% as.matrix %>% 
+      chull -> OuterWhich
+    
+    Outline <- PodLocations %>% 
+      slice(OuterWhich) %>% 
+      dplyr::select(X,Y)
+    
+    VoronoiDF %<>% filter(!Polygon %in% OuterWhich)
+    Centroids %<>% filter(!Polygon %in% OuterWhich)
+    PodPolygons %<>% filter(!Polygon %in% OuterWhich)
+    
+  }else if(RemoveOuter == "Stringent"){
+    
+    Centroids %>% 
+      dplyr::select(X,Y) %>% as.matrix %>% 
+      chull -> OuterWhichStringent
+    
+    Outline <- PodLocations %>% 
+      slice(OuterWhichStringent) %>% 
+      dplyr::select(X,Y)
+    
+    VoronoiDF %<>% filter(!Polygon %in% OuterWhichStringent)
+    Centroids %<>% filter(!Polygon %in% OuterWhichStringent)
+    PodPolygons %<>% filter(!Polygon %in% OuterWhichStringent)
+    
+  }
+  
   # Adding some shading ####
   
   if(ShadingDirection == "Uniform"){
@@ -204,7 +239,7 @@ Lotus <- function(
     
   }
   
-  1:length(Voronoi@polygons) %>% 
+  1:length(PodPolygonList) %>% 
     map(~PodPolygonList[[.x]] %>% 
           mutate_at("X", function(x) x + XShadowOffset[.x]) %>% 
           mutate_at("Y", function(y) y + YShadowOffset[.x]) %>% 
@@ -220,6 +255,41 @@ Lotus <- function(
     ) %>% bind_rows(.id = "Polygon") -> 
     
     PodInteriors
+  
+  if(RemoveOuter == "Relaxed"){
+    
+    PodInteriors %<>% 
+      filter(!Polygon %in% OuterWhich)
+    
+    PodLocations %<>% 
+      mutate_at("X", ~.x + XShadowOffset) %>% 
+      mutate_at("Y", ~.x + YShadowOffset) %>% 
+      slice(-OuterWhich)
+    
+  }else  if(RemoveOuter == "Stringent"){
+    
+    PodInteriors %<>% 
+      filter(!Polygon %in% OuterWhichStringent) %>% 
+      slice(-OuterWhichStringent)
+    
+    PodLocations %<>% 
+      mutate_at("X", ~.x + XShadowOffset) %>% 
+      mutate_at("Y", ~.x + YShadowOffset) %>% 
+      slice(-OuterWhichStringent)
+    
+  }else if(RemoveOuter == "None"){
+    
+    PodLocations %<>% 
+      mutate_at("X", ~.x + XShadowOffset) %>% 
+      mutate_at("Y", ~.x + YShadowOffset)
+    
+  }
+  
+  if(NetworkAdd){
+    
+    Network <- erdos.renyi.game(NPods, Density)
+    
+  }
   
   # Adding it all together ####
   
@@ -249,8 +319,6 @@ Lotus <- function(
     
     FlowerPlot <- FlowerPlot +
       geom_point(data = PodLocations %>% 
-                   mutate_at("X", ~.x + XShadowOffset) %>% 
-                   mutate_at("Y", ~.x + YShadowOffset) %>% 
                    RandomSlice(round(NPods)),
                  position = position_jitter(w = SpotJitter, h = SpotJitter),
                  alpha = 0.6)
@@ -268,8 +336,8 @@ Lotus <- function(
   
 }
 
-Lotus(OutlineAdd = F, 
-      NPod = 20, Size = 1,
+Lotus(OutlineAdd = T, 
+      NPods = 30, Size = 1,
       XNoise = 0, YNoise = 0,
       ShadowNoise = 0.02,
       SpotJitter = 0.1,
@@ -288,3 +356,5 @@ Lotus(OutlineAdd = F,
       YShadowOffset = -0.05,
       
       Grow = 0.1) #+ ggsave("Lotus1.jpeg")
+
+erdos.renyi.game(NPods, 0.05) %>% plot
