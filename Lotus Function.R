@@ -20,6 +20,9 @@ Lotus <- function(
   PointAdd = T,
   
   NetworkAdd = F,
+  Density = 0.05,
+  EdgeColour = "black", EdgeAlpha = 1, EdgeWidth = 1,
+  Network = "Spatial",
   
   SpotJitter = 0.1,
   
@@ -287,21 +290,63 @@ Lotus <- function(
   
   if(NetworkAdd){
     
-    Network <- erdos.renyi.game(NPods, Density)
+    if(Network == "Random"){
+      
+      Network <- erdos.renyi.game(NPods, Density)
+      
+      Network %>% get.edgelist() %>% as.data.frame() %>% 
+        rownames_to_column("Group") %>% 
+        gather("Whom", "Polygon", -Group) %>% 
+        mutate_at("Polygon", as.character) %>% 
+        dplyr::select(-Whom) %>% 
+        left_join(Centroids, by = c("Polygon")) -> 
+        
+        EdgeDF
+      
+    }else if(Network == "Spatial"){
+      
+      Centroids %>% dplyr::select(X, Y) %>% as.matrix %>% 
+        dist %>% as.matrix %>% reshape2::melt() %>% 
+        as.data.frame %>% 
+        mutate_at("value", ~scales::rescale(.x, c(0, Density))) %>% 
+        mutate(Connection = rbinom(n(), 1, value)) %>% 
+        filter(as.logical(Connection)) %>% 
+        dplyr::select(From = Var1, To = Var2) %>% 
+        rownames_to_column("Group") %>% 
+        gather("Whom", "Polygon", -Group) %>% 
+        mutate_at("Polygon", as.character) %>% 
+        dplyr::select(-Whom) %>% 
+        left_join(Centroids, by = c("Polygon")) -> 
+        
+        EdgeDF
+      
+    }
     
   }
   
   # Adding it all together ####
   
   VoronoiDF %>% 
-    ggplot(aes(X, Y)) + #, fill = Polygon)) + 
-    #geom_polygon(fill = "white", colour = LineColour, aes(group = Polygon)) +
-    # geom_polygon(data = Outline, fill = NA, colour = LineColour) + 
-    scale_fill_discrete_sequential(palette = AlberPalettes[[1]]) +
-    geom_polygon(data = PodInteriors, aes(group = Polygon), 
-                 fill = "white", colour = LineColour)  +
+    ggplot(aes(X, Y))  +
     coord_fixed() + 
     theme_void() ->
+    FlowerPlot
+  
+  if(NetworkAdd){
+    
+    FlowerPlot <- FlowerPlot + 
+      geom_path(data = EdgeDF, 
+                aes(group = Group), 
+                colour = EdgeColour, 
+                alpha = EdgeAlpha,
+                size = EdgeWidth)
+    
+  }
+  
+  FlowerPlot + 
+    scale_fill_discrete_sequential(palette = AlberPalettes[[1]]) +
+    geom_polygon(data = PodInteriors, aes(group = Polygon), 
+                 fill = "white", colour = LineColour) ->
     
     FlowerPlot
   
@@ -336,12 +381,24 @@ Lotus <- function(
   
 }
 
+Lotus(NetworkAdd = T, Density = 0.5, 
+      OutlineAdd = F, 
+      EdgeWidth = 3.5, EdgeAlpha = 0.5, 
+      EdgeColour = AlberColours[["Blue"]], Network = "Spatial") + 
+  ggsave("Lotus1.jpeg")
+
+Lotus(NetworkAdd = T, Density = 0.5, 
+      OutlineAdd = F, 
+      EdgeWidth = 3.5, EdgeAlpha = 0.5, 
+      EdgeColour = AlberColours[["Pink"]], Network = "Spatial") + 
+  ggsave("Lotus2.jpeg")
+
 Lotus(OutlineAdd = T, 
       NPods = 30, Size = 1,
       XNoise = 0, YNoise = 0,
       ShadowNoise = 0.02,
       SpotJitter = 0.1,
-      Grow = 0.2) + ggsave("Lotus1.jpeg")
+      Grow = 0.2)## + ggsave("Lotus1.jpeg")
 
 Lotus(OutlineAdd = F, 
       NPod = 20, Size = 1,
